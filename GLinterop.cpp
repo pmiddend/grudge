@@ -50,16 +50,15 @@ cl_program program = 0;
 void Cleanup();
 void computeVBO();
 
-GLuint initVBO()
+void initVBO()
 {
 	GLint bsize;
 
-	GLuint vbo_buffer; 
 	// generate the buffer
-	glGenBuffers(1, &vbo_buffer);
+	glGenBuffers(1, &vbo);
 
 	// bind the buffer 
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_buffer); 
+	glBindBuffer(GL_ARRAY_BUFFER, vbo); 
 	if( glGetError() != GL_NO_ERROR ) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 	}
@@ -73,7 +72,7 @@ GLuint initVBO()
 	// recheck the size of the created buffer to make sure its what we requested
 	glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bsize); 
 	if ((GLuint)bsize != (vbolen*sizeof(float)*4)) {
-		printf("Vertex Buffer object (%d) has incorrect size (%d).\n", (unsigned)vbo_buffer, (unsigned)bsize);
+		printf("Vertex Buffer object (%d) has incorrect size (%d).\n", (unsigned)vbo, (unsigned)bsize);
 	}
 
 	// we're done, so unbind the buffers
@@ -81,7 +80,6 @@ GLuint initVBO()
 	if( glGetError() != GL_NO_ERROR ) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 	}
-	return vbo_buffer;
 }
 
 void computeVBO()
@@ -355,7 +353,8 @@ int main(int argc, char** argv)
 	glutDisplayFunc(computeVBO);
 	glutIdleFunc(computeVBO);
 	glewInit();
-	vbo = initVBO();
+
+	initVBO();
 
     // Create an OpenCL context on first available platform
     context = CreateContext();
