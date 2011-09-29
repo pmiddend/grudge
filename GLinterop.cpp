@@ -39,6 +39,7 @@
 //
 GLuint vbo = 0;
 int const vbolen = 256; 
+cl_device_id device;
 cl_mem cl_vbo_mem;
 cl_kernel kernel = 0;
 cl_context context = 0;
@@ -200,7 +201,7 @@ cl_uint uiDevCount;
 //  Create a command queue on the first device available on the
 //  context
 //
-void CreateCommandQueue(cl_context context, cl_device_id *device)
+void CreateCommandQueue()
 {
     cl_int errNum;
     cl_device_id *devices;
@@ -239,21 +240,19 @@ void CreateCommandQueue(cl_context context, cl_device_id *device)
         return;
     }
 
-    *device = devices[0];
+    device = devices[0];
     delete [] devices;
 }
 
 ///
 //  Create an OpenCL program from the kernel source file
 //
-void CreateProgram(cl_context context, cl_device_id device, const char* fileName)
+void CreateProgram()
 {
 	cl_int errNum;
 
 	char const * strings[] = { kernel_string };
-	program = clCreateProgramWithSource(context, 1,
-																			strings,
-																			NULL, NULL);
+	program = clCreateProgramWithSource(context, 1, strings, 0, 0);
 	if (program == NULL)
 	{
 			std::cerr << "Failed to create CL program from source." << std::endl;
@@ -279,11 +278,11 @@ void CreateProgram(cl_context context, cl_device_id device, const char* fileName
 //  Create memory objects used as the arguments to kernels in OpenCL
 //  The memory objects are created from existing OpenGL buffers
 //
-bool CreateMemObjects(cl_context context, GLuint vbo, cl_mem *p_cl_vbo_mem )
+bool CreateMemObjects()
 {
 	cl_int errNum;
 
-	*p_cl_vbo_mem = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, vbo, &errNum );
+	cl_vbo_mem = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, vbo, &errNum );
 	if( errNum != CL_SUCCESS )
 	{
 		std::cerr<< "Failed creating memory from GL buffer." << std::endl;
@@ -327,8 +326,6 @@ void Cleanup()
 //
 int main(int argc, char** argv)
 {
-	cl_device_id device = 0;
-
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 	glutCreateWindow("GL interop");
@@ -347,14 +344,14 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	CreateCommandQueue(context, &device);
+	CreateCommandQueue();
 	if(!commandQueue)
 	{
 		Cleanup();
 		return EXIT_FAILURE;
 	}
 
-	CreateProgram(context, device, "GLinterop.cl");
+	CreateProgram();
 	if(!program)
 	{
 		Cleanup();
@@ -363,20 +360,20 @@ int main(int argc, char** argv)
 
 	// Create OpenCL kernel
 	kernel = clCreateKernel(program, "init_vbo_kernel", NULL);
-	if (kernel == NULL)
+	if(!kernel)
 	{
 		std::cerr << "Failed to create kernel" << std::endl;
 		Cleanup();
 		return EXIT_FAILURE;
 	}
 
-    // Create memory objects that will be used as arguments to
-    // kernel
-    if (!CreateMemObjects(context, vbo, &cl_vbo_mem))
-    {
-        Cleanup();
-        return EXIT_FAILURE;
-    }
+	// Create memory objects that will be used as arguments to
+	// kernel
+	if (!CreateMemObjects())
+	{
+		Cleanup();
+		return EXIT_FAILURE;
+	}
 
 	glutMainLoop();
 
