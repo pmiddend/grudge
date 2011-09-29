@@ -126,12 +126,11 @@ void computeVBO()
 //  Create an OpenCL context on the first available platform using
 //  either a GPU or CPU depending on what is available.
 //
-cl_context CreateContext()
+void CreateContext()
 {
 	cl_int errNum;
 	cl_uint numPlatforms;
 	cl_platform_id firstPlatformId;
-	cl_context context = NULL;
 
 	// First, select an OpenCL platform to run on.  For this example, we
 	// simply choose the first available platform.  Normally, you would
@@ -140,7 +139,7 @@ cl_context CreateContext()
 	if (errNum != CL_SUCCESS || numPlatforms <= 0)
 	{
 			std::cerr << "Failed to find any OpenCL platforms." << std::endl;
-			return NULL;
+			return;
 	}
 
 	// Next, create an OpenCL context on the platform.  Attempt to
@@ -190,22 +189,19 @@ cl_uint uiDevCount;
 			if (errNum != CL_SUCCESS)
 			{
 					std::cerr << "Failed to create an OpenCL GPU or CPU context." << std::endl;
-					return NULL;
+					return;
 			}
 	}
-
-	return context;
 }
 
 ///
 //  Create a command queue on the first device available on the
 //  context
 //
-cl_command_queue CreateCommandQueue(cl_context context, cl_device_id *device)
+void CreateCommandQueue(cl_context context, cl_device_id *device)
 {
     cl_int errNum;
     cl_device_id *devices;
-    cl_command_queue commandQueue = NULL;
     size_t deviceBufferSize = -1;
 
     // First get the size of the devices buffer
@@ -213,13 +209,13 @@ cl_command_queue CreateCommandQueue(cl_context context, cl_device_id *device)
     if (errNum != CL_SUCCESS)
     {
         std::cerr << "Failed call to clGetContextInfo(...,GL_CONTEXT_DEVICES,...)";
-        return NULL;
+        return;
     }
 
     if (deviceBufferSize <= 0)
     {
         std::cerr << "No devices available.";
-        return NULL;
+        return;
     }
 
     // Allocate memory for the devices buffer
@@ -228,7 +224,7 @@ cl_command_queue CreateCommandQueue(cl_context context, cl_device_id *device)
     if (errNum != CL_SUCCESS)
     {
         std::cerr << "Failed to get device IDs";
-        return NULL;
+        return;
     }
 
     // In this example, we just choose the first available device.  In a
@@ -238,27 +234,25 @@ cl_command_queue CreateCommandQueue(cl_context context, cl_device_id *device)
     if (commandQueue == NULL)
     {
         std::cerr << "Failed to create commandQueue for device 0";
-        return NULL;
+        return;
     }
 
     *device = devices[0];
     delete [] devices;
-    return commandQueue;
 }
 
 ///
 //  Create an OpenCL program from the kernel source file
 //
-cl_program CreateProgram(cl_context context, cl_device_id device, const char* fileName)
+void CreateProgram(cl_context context, cl_device_id device, const char* fileName)
 {
     cl_int errNum;
-    cl_program program;
 
     std::ifstream kernelFile(fileName, std::ios::in);
     if (!kernelFile.is_open())
     {
         std::cerr << "Failed to open file for reading: " << fileName << std::endl;
-        return NULL;
+        return;
     }
 
     std::ostringstream oss;
@@ -272,7 +266,7 @@ cl_program CreateProgram(cl_context context, cl_device_id device, const char* fi
     if (program == NULL)
     {
         std::cerr << "Failed to create CL program from source." << std::endl;
-        return NULL;
+        return;
     }
 
     errNum = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
@@ -286,10 +280,8 @@ cl_program CreateProgram(cl_context context, cl_device_id device, const char* fi
         std::cerr << "Error in kernel: " << std::endl;
         std::cerr << buildLog;
         clReleaseProgram(program);
-        return NULL;
+        return;
     }
-
-    return program;
 }
 
 ///
@@ -356,46 +348,43 @@ int main(int argc, char** argv)
 
 	initVBO();
 
-    // Create an OpenCL context on first available platform
-    context = CreateContext();
-    if (context == NULL)
-    {
-        std::cerr << "Failed to create OpenCL context." << std::endl;
-        return 1;
-    }
+	// Create an OpenCL context on first available platform
+	CreateContext();
+	if (!context)
+	{
+		std::cerr << "Failed to create OpenCL context." << std::endl;
+		return EXIT_FAILURE;
+	}
 
-    // Create a command-queue on the first device available
-    // on the created context
-    commandQueue = CreateCommandQueue(context, &device);
-    if (commandQueue == NULL)
-    {
-        Cleanup();
-        return 1;
-    }
+	CreateCommandQueue(context, &device);
+	if (commandQueue == NULL)
+	{
+		Cleanup();
+		return EXIT_FAILURE;
+	}
 
-    // Create OpenCL program from GLinterop.cl kernel source
-    program = CreateProgram(context, device, "GLinterop.cl");
-    if (program == NULL)
-    {
-        Cleanup();
-        return 1;
-    }
+	CreateProgram(context, device, "GLinterop.cl");
+	if (program == NULL)
+	{
+		Cleanup();
+		return EXIT_FAILURE;
+	}
 
-    // Create OpenCL kernel
-    kernel = clCreateKernel(program, "init_vbo_kernel", NULL);
-    if (kernel == NULL)
-    {
-        std::cerr << "Failed to create kernel" << std::endl;
-        Cleanup();
-        return 1;
-    }
+	// Create OpenCL kernel
+	kernel = clCreateKernel(program, "init_vbo_kernel", NULL);
+	if (kernel == NULL)
+	{
+		std::cerr << "Failed to create kernel" << std::endl;
+		Cleanup();
+		return EXIT_FAILURE;
+	}
 
     // Create memory objects that will be used as arguments to
     // kernel
     if (!CreateMemObjects(context, vbo, &cl_vbo_mem))
     {
         Cleanup();
-        return 1;
+        return EXIT_FAILURE;
     }
 
 	glutMainLoop();
