@@ -50,17 +50,6 @@ cl_program program = 0;
 void Cleanup();
 void computeVBO();
 
-void initGlut(int argc, char *argv[])
-{
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-	glutCreateWindow("GL interop");
-	glutIconifyWindow();
-	glutDisplayFunc(computeVBO);
-	glutIdleFunc(computeVBO);
-	glewInit();
-}
-
 GLuint initVBO()
 {
 	GLint bsize;
@@ -359,7 +348,13 @@ int main(int argc, char** argv)
 {
 	cl_device_id device = 0;
 
-	initGlut(argc, argv);
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
+	glutCreateWindow("GL interop");
+	glutIconifyWindow();
+	glutDisplayFunc(computeVBO);
+	glutIdleFunc(computeVBO);
+	glewInit();
 	vbo = initVBO();
 
     // Create an OpenCL context on first available platform
