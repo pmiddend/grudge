@@ -101,15 +101,8 @@ void computeVBO()
 {
 	cl_int errNum;
 
-	// a small internal counter for animation
-	static cl_int seq = 0;
-	seq = (seq+1)%(imWidth);
-
 	// Set the kernel arguments, send the cl_mem object for the VBO
 	errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_vbo_mem);
-	errNum = clSetKernelArg(kernel, 1, sizeof(cl_int), &imWidth);
-	errNum = clSetKernelArg(kernel, 2, sizeof(cl_int), &imHeight);
-	errNum = clSetKernelArg(kernel, 3, sizeof(cl_int), &seq);
 	if (errNum != CL_SUCCESS)
 	{
 		std::cerr << "Error setting kernel arguments." << std::endl;
@@ -341,15 +334,15 @@ void Cleanup()
 		clReleaseCommandQueue(commandQueue);
 
 	if (kernel != 0)
-        clReleaseKernel(kernel);
+		clReleaseKernel(kernel);
 
-    if (program != 0)
-        clReleaseProgram(program);
+	if (program != 0)
+		clReleaseProgram(program);
 
-    if (context != 0)
-        clReleaseContext(context);
+	if (context != 0)
+		clReleaseContext(context);
 
-	if( cl_vbo_mem != 0 ) 
+	if( cl_vbo_mem != 0) 
 		clReleaseMemObject(cl_vbo_mem);
 
 	// after we have released the OpenCL references, we can delete the underlying OpenGL objects
