@@ -1,42 +1,20 @@
-//
-// Book:      OpenCL(R) Programming Guide
-// Authors:   Aaftab Munshi, Benedict Gaster, Timothy Mattson, James Fung, Dan Ginsburg
-// ISBN-10:   0-321-74964-2
-// ISBN-13:   978-0-321-74964-2
-// Publisher: Addison-Wesley Professional
-// URLs:      http://safari.informit.com/9780132488006/
-//            http://www.openclprogrammingguide.com
-//
-
-// GLinterop.cpp
-//
-//    This is a simple example that demonstrates basic OpenCL setup and
-//    use.
-
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
-#ifdef __APPLE__
-#include <OpenCL/cl.h>
-#else
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
-#endif
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#include <GL/glew.h>
+//#include <GL/glew.h>
 #include <GL/freeglut.h>
 
 #ifdef __GNUC__
 #include <GL/glx.h>
 #endif
 
-///
-// OpenGL/CL variables, objects
-//
 GLuint vbo = 0;
 int const vbolen = 256; 
 cl_device_id device;
@@ -45,13 +23,44 @@ cl_kernel kernel = 0;
 cl_context context = 0;
 cl_command_queue commandQueue = 0;
 cl_program program = 0;
+int const iterations = 8000;
 
-char const kernel_string[] = "__kernel void init_vbo_kernel(__global float4 *vbo) { vbo[get_global_id(0)] = 0.0f; }";
+char const kernel_string[] = 
+	"__kernel void init_vbo_kernel(__global float4 *vbo) { vbo[get_global_id(0)] = 0.0f; }";
 
-///
-// Forward declarations
-void Cleanup();
-void computeVBO();
+void Cleanup()
+{
+	if(commandQueue)
+		clReleaseCommandQueue(commandQueue);
+
+	if(kernel)
+		clReleaseKernel(kernel);
+
+	if(program)
+		clReleaseProgram(program);
+
+	if(context)
+	{
+		std::cerr << "Before releasing context\n";
+		clReleaseContext(context);
+		std::cerr << "After releasing context\n";
+	}
+
+	if(cl_vbo_mem) 
+	{
+		std::cerr << "Before releasing memory object\n";
+		clReleaseMemObject(cl_vbo_mem);
+		std::cerr << "After releasing memory object\n";
+	}
+
+	if(vbo)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER_ARB, 0);
+		glDeleteBuffers(1, &vbo);
+	}
+
+	exit(0);
+}
 
 void initVBO()
 {
@@ -62,26 +71,29 @@ void initVBO()
 
 	// bind the buffer 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo); 
-	if( glGetError() != GL_NO_ERROR ) {
-		std::cerr<<"Could not bind buffer"<<std::endl;
+	if(glGetError() != GL_NO_ERROR) {
+		std::cerr << "Could not bind buffer" << std::endl;
+		exit(0);
 	}
 
-	// create the buffer, this basically sets/allocates the size
-	// for our VBO we will hold 2 line endpoints per element
 	glBufferData(GL_ARRAY_BUFFER, vbolen*sizeof(float)*4, NULL, GL_STREAM_DRAW);  
-	if( glGetError() != GL_NO_ERROR ) {
+	if(glGetError() != GL_NO_ERROR) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
+		exit(0);
 	}
+
 	// recheck the size of the created buffer to make sure its what we requested
 	glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bsize); 
 	if ((GLuint)bsize != (vbolen*sizeof(float)*4)) {
 		printf("Vertex Buffer object (%d) has incorrect size (%d).\n", (unsigned)vbo, (unsigned)bsize);
+		exit(0);
 	}
 
 	// we're done, so unbind the buffers
 	glBindBuffer(GL_ARRAY_BUFFER, 0);                    
-	if( glGetError() != GL_NO_ERROR ) {
+	if(glGetError() != GL_NO_ERROR) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
+		exit(0);
 	}
 }
 
@@ -107,7 +119,7 @@ void computeVBO()
 	errNum = clEnqueueAcquireGLObjects(commandQueue, 1, &cl_vbo_mem, 0, NULL, NULL );
 
 	// Queue the kernel up for execution across the array
-	for(int i = 0; i < 4000; ++i)
+	for(int i = 0; i < iterations; ++i)
 	{
 		errNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL,
 																globalWorkSize, localWorkSize,
@@ -135,9 +147,6 @@ void CreateContext()
 	cl_uint numPlatforms;
 	cl_platform_id firstPlatformId;
 
-	// First, select an OpenCL platform to run on.  For this example, we
-	// simply choose the first available platform.  Normally, you would
-	// query for all available platforms and select the most appropriate one.
 	errNum = clGetPlatformIDs(1, &firstPlatformId, &numPlatforms);
 	if (errNum != CL_SUCCESS || numPlatforms <= 0)
 	{
@@ -145,69 +154,46 @@ void CreateContext()
 			return;
 	}
 
-	// Next, create an OpenCL context on the platform.  Attempt to
-	// create a GPU-based context, and if that fails, try to create
-	// a CPU-based context.
 	cl_context_properties contextProperties[] =
 	{
 #ifdef _WIN32
-			CL_CONTEXT_PLATFORM,
-			(cl_context_properties)firstPlatformId,
-	CL_GL_CONTEXT_KHR,
-	(cl_context_properties)wglGetCurrentContext(),
-	CL_WGL_HDC_KHR,
-	(cl_context_properties)wglGetCurrentDC(),
+		CL_CONTEXT_PLATFORM,
+		(cl_context_properties)firstPlatformId,
+		CL_GL_CONTEXT_KHR,
+		(cl_context_properties)wglGetCurrentContext(),
+		CL_WGL_HDC_KHR,
+		(cl_context_properties)wglGetCurrentDC(),
 #elif defined( __GNUC__)
-	CL_CONTEXT_PLATFORM, (cl_context_properties)firstPlatformId, 
-	CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(), 
-	CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(), 
-#elif defined(__APPLE__) 
-	//todo
+		CL_CONTEXT_PLATFORM, (cl_context_properties)firstPlatformId, 
+		CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(), 
+		CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(), 
+#else
 #endif
-			0
-
-
-
+		0
 	};
-cl_uint uiDevCount;
+
+	cl_uint uiDevCount;
 	cl_device_id* cdDevices;
-// Get the number of GPU devices available to the platform
 	errNum = clGetDeviceIDs(firstPlatformId, CL_DEVICE_TYPE_GPU, 0, NULL, &uiDevCount);
 
-	// Create the device list
 	cdDevices = new cl_device_id [uiDevCount];
 	errNum = clGetDeviceIDs(firstPlatformId, CL_DEVICE_TYPE_GPU, uiDevCount, cdDevices, NULL);
 
-
 	context = clCreateContext(contextProperties, 1, &cdDevices[0], NULL, NULL, &errNum);
-//// alternate:
-	//context = clCreateContextFromType(contextProperties, CL_DEVICE_TYPE_GPU,
-	//                                  NULL, NULL, &errNum);
 
 	if (errNum != CL_SUCCESS)
 	{
-			std::cout << "Could not create GPU context, trying CPU..." << std::endl;
-			context = clCreateContextFromType(contextProperties, CL_DEVICE_TYPE_CPU,
-																				NULL, NULL, &errNum);
-			if (errNum != CL_SUCCESS)
-			{
-					std::cerr << "Failed to create an OpenCL GPU or CPU context." << std::endl;
-					return;
-			}
+		std::cerr << "Failed to create an OpenCL GPU or CPU context." << std::endl;
+		return;
 	}
 }
 
-///
-//  Create a command queue on the first device available on the
-//  context
-//
 void CreateCommandQueue()
 {
     cl_int errNum;
     cl_device_id *devices;
     size_t deviceBufferSize = -1;
 
-    // First get the size of the devices buffer
     errNum = clGetContextInfo(context, CL_CONTEXT_DEVICES, 0, NULL, &deviceBufferSize);
     if (errNum != CL_SUCCESS)
     {
@@ -221,7 +207,6 @@ void CreateCommandQueue()
         return;
     }
 
-    // Allocate memory for the devices buffer
     devices = new cl_device_id[deviceBufferSize / sizeof(cl_device_id)];
     errNum = clGetContextInfo(context, CL_CONTEXT_DEVICES, deviceBufferSize, devices, NULL);
     if (errNum != CL_SUCCESS)
@@ -230,9 +215,6 @@ void CreateCommandQueue()
         return;
     }
 
-    // In this example, we just choose the first available device.  In a
-    // real program, you would likely use all available devices or choose
-    // the highest performance device based on OpenCL device queries
     commandQueue = clCreateCommandQueue(context, devices[0], 0, NULL);
     if (commandQueue == NULL)
     {
@@ -244,9 +226,6 @@ void CreateCommandQueue()
     delete [] devices;
 }
 
-///
-//  Create an OpenCL program from the kernel source file
-//
 void CreateProgram()
 {
 	cl_int errNum;
@@ -255,75 +234,39 @@ void CreateProgram()
 	program = clCreateProgramWithSource(context, 1, strings, 0, 0);
 	if (program == NULL)
 	{
-			std::cerr << "Failed to create CL program from source." << std::endl;
-			return;
+		std::cerr << "Failed to create CL program from source." << std::endl;
+		return;
 	}
 
 	errNum = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
 	if (errNum != CL_SUCCESS)
 	{
-			// Determine the reason for the error
-			char buildLog[16384];
-			clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-														sizeof(buildLog), buildLog, NULL);
+		char buildLog[16384];
+		clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
+													sizeof(buildLog), buildLog, NULL);
 
-			std::cerr << "Error in kernel: " << std::endl;
-			std::cerr << buildLog;
-			clReleaseProgram(program);
-			return;
+		std::cerr << "Error in kernel: " << std::endl;
+		std::cerr << buildLog;
+		clReleaseProgram(program);
+		return;
 	}
 }
 
-///
-//  Create memory objects used as the arguments to kernels in OpenCL
-//  The memory objects are created from existing OpenGL buffers
-//
 bool CreateMemObjects()
 {
 	cl_int errNum;
 
 	cl_vbo_mem = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, vbo, &errNum );
-	if( errNum != CL_SUCCESS )
+	if(errNum != CL_SUCCESS)
 	{
 		std::cerr<< "Failed creating memory from GL buffer." << std::endl;
 		return false;
 	}
 	
-    return true;
+	return true;
 }
 
-///
-//  Cleanup any created OpenCL resources
-//
-void Cleanup()
-{
-	if (commandQueue != 0)
-		clReleaseCommandQueue(commandQueue);
 
-	if (kernel != 0)
-		clReleaseKernel(kernel);
-
-	if (program != 0)
-		clReleaseProgram(program);
-
-	if (context != 0)
-		clReleaseContext(context);
-
-	if( cl_vbo_mem != 0) 
-		clReleaseMemObject(cl_vbo_mem);
-
-	// after we have released the OpenCL references, we can delete the underlying OpenGL objects
-	if( vbo != 0 )
-	{
-		glBindBuffer(GL_ARRAY_BUFFER_ARB, vbo);
-		glDeleteBuffers(1, &vbo);
-	}
-	exit(0);
-}
-
-///
-//	main() for GLinterop example
-//
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -332,7 +275,7 @@ int main(int argc, char** argv)
 	glutIconifyWindow();
 	glutDisplayFunc(computeVBO);
 	glutIdleFunc(computeVBO);
-	glewInit();
+	//glewInit();
 
 	initVBO();
 
@@ -377,9 +320,7 @@ int main(int argc, char** argv)
 
 	glutMainLoop();
 
-    std::cout << std::endl;
-    std::cout << "Executed program succesfully." << std::endl;
-    Cleanup();
-
-    return 0;
+	std::cout << std::endl;
+	std::cout << "Executed program succesfully." << std::endl;
+	Cleanup();
 }
