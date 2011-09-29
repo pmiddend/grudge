@@ -45,6 +45,8 @@ cl_context context = 0;
 cl_command_queue commandQueue = 0;
 cl_program program = 0;
 
+char const kernel_string[] = "__kernel void init_vbo_kernel(__global float4 *vbo) { vbo[get_global_id(0)] = 0.0f; }";
+
 ///
 // Forward declarations
 void Cleanup();
@@ -246,42 +248,31 @@ void CreateCommandQueue(cl_context context, cl_device_id *device)
 //
 void CreateProgram(cl_context context, cl_device_id device, const char* fileName)
 {
-    cl_int errNum;
+	cl_int errNum;
 
-    std::ifstream kernelFile(fileName, std::ios::in);
-    if (!kernelFile.is_open())
-    {
-        std::cerr << "Failed to open file for reading: " << fileName << std::endl;
-        return;
-    }
+	char const * strings[] = { kernel_string };
+	program = clCreateProgramWithSource(context, 1,
+																			strings,
+																			NULL, NULL);
+	if (program == NULL)
+	{
+			std::cerr << "Failed to create CL program from source." << std::endl;
+			return;
+	}
 
-    std::ostringstream oss;
-    oss << kernelFile.rdbuf();
+	errNum = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+	if (errNum != CL_SUCCESS)
+	{
+			// Determine the reason for the error
+			char buildLog[16384];
+			clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
+														sizeof(buildLog), buildLog, NULL);
 
-    std::string srcStdStr = oss.str();
-    const char *srcStr = srcStdStr.c_str();
-    program = clCreateProgramWithSource(context, 1,
-                                        (const char**)&srcStr,
-                                        NULL, NULL);
-    if (program == NULL)
-    {
-        std::cerr << "Failed to create CL program from source." << std::endl;
-        return;
-    }
-
-    errNum = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-    if (errNum != CL_SUCCESS)
-    {
-        // Determine the reason for the error
-        char buildLog[16384];
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-                              sizeof(buildLog), buildLog, NULL);
-
-        std::cerr << "Error in kernel: " << std::endl;
-        std::cerr << buildLog;
-        clReleaseProgram(program);
-        return;
-    }
+			std::cerr << "Error in kernel: " << std::endl;
+			std::cerr << buildLog;
+			clReleaseProgram(program);
+			return;
+	}
 }
 
 ///
@@ -350,21 +341,21 @@ int main(int argc, char** argv)
 
 	// Create an OpenCL context on first available platform
 	CreateContext();
-	if (!context)
+	if(!context)
 	{
 		std::cerr << "Failed to create OpenCL context." << std::endl;
 		return EXIT_FAILURE;
 	}
 
 	CreateCommandQueue(context, &device);
-	if (commandQueue == NULL)
+	if(!commandQueue)
 	{
 		Cleanup();
 		return EXIT_FAILURE;
 	}
 
 	CreateProgram(context, device, "GLinterop.cl");
-	if (program == NULL)
+	if(!program)
 	{
 		Cleanup();
 		return EXIT_FAILURE;
