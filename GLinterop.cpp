@@ -1,6 +1,4 @@
 #include <iostream>
-#include <fstream>
-#include <sstream>
 
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
@@ -8,13 +6,16 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-//#include <GL/glew.h>
+#define GL_GLEXT_PROTOTYPES
+#include <GL/gl.h>
+#include <GL/glext.h>
 #include <GL/freeglut.h>
 
 #ifdef __GNUC__
 #include <GL/glx.h>
 #endif
 
+// For simplicity, all out variables are global
 GLuint vbo = 0;
 int const vbolen = 256; 
 cl_device_id device;
@@ -23,6 +24,7 @@ cl_kernel kernel = 0;
 cl_context context = 0;
 cl_command_queue commandQueue = 0;
 cl_program program = 0;
+// This controls how often it crashes.
 int const iterations = 8000;
 
 char const kernel_string[] = 
@@ -64,33 +66,21 @@ void Cleanup()
 
 void initVBO()
 {
-	GLint bsize;
-
-	// generate the buffer
 	glGenBuffers(1, &vbo);
 
-	// bind the buffer 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo); 
 	if(glGetError() != GL_NO_ERROR) {
 		std::cerr << "Could not bind buffer" << std::endl;
 		exit(0);
 	}
 
-	glBufferData(GL_ARRAY_BUFFER, vbolen*sizeof(float)*4, NULL, GL_STREAM_DRAW);  
+	glBufferData(GL_ARRAY_BUFFER, vbolen*sizeof(float)*4, NULL, GL_STREAM_DRAW);
 	if(glGetError() != GL_NO_ERROR) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 		exit(0);
 	}
 
-	// recheck the size of the created buffer to make sure its what we requested
-	glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bsize); 
-	if ((GLuint)bsize != (vbolen*sizeof(float)*4)) {
-		printf("Vertex Buffer object (%d) has incorrect size (%d).\n", (unsigned)vbo, (unsigned)bsize);
-		exit(0);
-	}
-
-	// we're done, so unbind the buffers
-	glBindBuffer(GL_ARRAY_BUFFER, 0);                    
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	if(glGetError() != GL_NO_ERROR) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 		exit(0);
@@ -101,7 +91,6 @@ void computeVBO()
 {
 	cl_int errNum;
 
-	// Set the kernel arguments, send the cl_mem object for the VBO
 	errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_vbo_mem);
 	if (errNum != CL_SUCCESS)
 	{
@@ -112,13 +101,9 @@ void computeVBO()
 	size_t globalWorkSize[1] = { vbolen };
 	size_t localWorkSize[1] = { 32 };
 
-	// Acquire the GL Object
-	// Note, we should ensure GL is completed with any commands that might affect this VBO
-	// before we issue OpenCL commands
 	glFinish();
 	errNum = clEnqueueAcquireGLObjects(commandQueue, 1, &cl_vbo_mem, 0, NULL, NULL );
 
-	// Queue the kernel up for execution across the array
 	for(int i = 0; i < iterations; ++i)
 	{
 		errNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL,
@@ -130,17 +115,11 @@ void computeVBO()
 		}
 	}
 
-	// Release the GL Object
-	// Note, we should ensure OpenCL is finished with any commands that might affect the VBO
 	errNum = clEnqueueReleaseGLObjects(commandQueue, 1, &cl_vbo_mem, 0, NULL, NULL );
 	clFinish(commandQueue);
 	Cleanup();
 }
 
-///
-//  Create an OpenCL context on the first available platform using
-//  either a GPU or CPU depending on what is available.
-//
 void CreateContext()
 {
 	cl_int errNum;
@@ -190,40 +169,40 @@ void CreateContext()
 
 void CreateCommandQueue()
 {
-    cl_int errNum;
-    cl_device_id *devices;
-    size_t deviceBufferSize = -1;
+	cl_int errNum;
+	cl_device_id *devices;
+	size_t deviceBufferSize = -1;
 
-    errNum = clGetContextInfo(context, CL_CONTEXT_DEVICES, 0, NULL, &deviceBufferSize);
-    if (errNum != CL_SUCCESS)
-    {
-        std::cerr << "Failed call to clGetContextInfo(...,GL_CONTEXT_DEVICES,...)";
-        return;
-    }
+	errNum = clGetContextInfo(context, CL_CONTEXT_DEVICES, 0, NULL, &deviceBufferSize);
+	if (errNum != CL_SUCCESS)
+	{
+		std::cerr << "Failed call to clGetContextInfo(...,GL_CONTEXT_DEVICES,...)";
+		return;
+	}
 
-    if (deviceBufferSize <= 0)
-    {
-        std::cerr << "No devices available.";
-        return;
-    }
+	if (deviceBufferSize <= 0)
+	{
+		std::cerr << "No devices available.";
+		return;
+	}
 
-    devices = new cl_device_id[deviceBufferSize / sizeof(cl_device_id)];
-    errNum = clGetContextInfo(context, CL_CONTEXT_DEVICES, deviceBufferSize, devices, NULL);
-    if (errNum != CL_SUCCESS)
-    {
-        std::cerr << "Failed to get device IDs";
-        return;
-    }
+	devices = new cl_device_id[deviceBufferSize / sizeof(cl_device_id)];
+	errNum = clGetContextInfo(context, CL_CONTEXT_DEVICES, deviceBufferSize, devices, NULL);
+	if (errNum != CL_SUCCESS)
+	{
+		std::cerr << "Failed to get device IDs";
+		return;
+	}
 
-    commandQueue = clCreateCommandQueue(context, devices[0], 0, NULL);
-    if (commandQueue == NULL)
-    {
-        std::cerr << "Failed to create commandQueue for device 0";
-        return;
-    }
+	commandQueue = clCreateCommandQueue(context, devices[0], 0, NULL);
+	if (commandQueue == NULL)
+	{
+		std::cerr << "Failed to create commandQueue for device 0";
+		return;
+	}
 
-    device = devices[0];
-    delete [] devices;
+	device = devices[0];
+	delete [] devices;
 }
 
 void CreateProgram()
@@ -242,9 +221,7 @@ void CreateProgram()
 	if (errNum != CL_SUCCESS)
 	{
 		char buildLog[16384];
-		clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-													sizeof(buildLog), buildLog, NULL);
-
+		clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, sizeof(buildLog), buildLog, NULL);
 		std::cerr << "Error in kernel: " << std::endl;
 		std::cerr << buildLog;
 		clReleaseProgram(program);
@@ -266,7 +243,6 @@ bool CreateMemObjects()
 	return true;
 }
 
-
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -275,11 +251,9 @@ int main(int argc, char** argv)
 	glutIconifyWindow();
 	glutDisplayFunc(computeVBO);
 	glutIdleFunc(computeVBO);
-	//glewInit();
 
 	initVBO();
 
-	// Create an OpenCL context on first available platform
 	CreateContext();
 	if(!context)
 	{
@@ -301,7 +275,6 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	// Create OpenCL kernel
 	kernel = clCreateKernel(program, "init_vbo_kernel", NULL);
 	if(!kernel)
 	{
@@ -310,8 +283,6 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	// Create memory objects that will be used as arguments to
-	// kernel
 	if (!CreateMemObjects())
 	{
 		Cleanup();

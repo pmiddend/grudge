@@ -11,7 +11,6 @@ ENDIF("${ISWIN64}" STREQUAL "Win64")
 
 FIND_PACKAGE(GLUT REQUIRED)
 FIND_PACKAGE(OpenGL REQUIRED)
-FIND_PACKAGE(GLEW REQUIRED)
 FIND_PACKAGE(OpenCL REQUIRED)
 
 ADD_DEFINITIONS("-Wall -Wextra -ansi -pedantic")
@@ -20,8 +19,6 @@ IF(WIN32)
 		SET( GLUT_LIBRARIES "freeglut.lib")
 ENDIF(WIN32)
 
-MESSAGE("${GLEW_INCLUDE_PATH}")
-link_directories(${CMAKE_LIBRARY_PATH} ${GLEW_LIBRARY_PATH})
 add_executable( GLinterop GLinterop.cpp )
 include_directories( ${GLUT_INCLUDE_DIR} ${OPENGL_INCLUDE_DIR})
-target_link_libraries( GLinterop ${OPENCL_LIBRARIES} ${GLUT_LIBRARIES} ${GLEW_LIBRARY} )
+target_link_libraries( GLinterop ${OPENCL_LIBRARIES} ${GLUT_LIBRARIES} ${OPENGL_LIBRARY} )
