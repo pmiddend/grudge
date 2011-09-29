@@ -1,0 +1,12 @@
+#!/bin/bash
+
+declare -i success=0 max=100
+
+for ((i=0; i<max; ++i)); do
+	if ./GLinterop >/dev/null 2>&1; then
+		echo "Success"
+		((++success));
+	fi
+done
+
+echo "${success}/${max}"
