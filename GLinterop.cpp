@@ -50,121 +50,54 @@ cl_program program = 0;
 ///
 // Forward declarations
 void Cleanup();
-cl_int computeVBO();
+void computeVBO();
 
-///
-// Render the vertex buffer object (VBO) contents
-//
-void renderVBO( int vbolen ) 
-{
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glLineWidth(2.0f);
-	// Draw VBO containing the point list coordinates, to place GL_POINTS at feature locations
-	// bind VBOs for vertex array and index array
-    glBindBufferARB(GL_ARRAY_BUFFER_ARB, vbo);         // for vertex coordinates
-    glEnableClientState(GL_VERTEX_ARRAY);             // activate vertex coords array
-    glVertexPointer( 2, GL_FLOAT, 0, 0 );
-	 
-    // draw lines with endpoints given in the array
-    glDrawArrays(GL_LINES, 0, vbolen*2);
-
-    glDisableClientState(GL_VERTEX_ARRAY);            // deactivate vertex array
-
-    // bind with 0, so, switch back to normal pointer operation
-    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
-}
-
-void reshape(int width, int height) 
-{
-	glViewport( 0, 0, width, height );
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	//gluOrtho2D(0,width,height,0);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-}
-
-///
-// Main rendering call for the scene
-//
-void renderScene(void)
-{
-	glClearColor(0.0f, 0.0f, 1.0f, 1.0f );
-	glClear( GL_COLOR_BUFFER_BIT );
-	computeVBO();
-
-	//renderVBO( vbolen );
-	glutSwapBuffers();
-}
-
-///
-// Keyboard events handler
-//
-void KeyboardGL(unsigned char key, int x, int y)
-{
-    switch(key) 
-    {
-        case '\033': // escape quits
-        case '\015': // Enter quits    
-        case 'Q':    // Q quits
-        case 'q':    // q (or escape) quits
-            // Cleanup up and quit
-	        Cleanup();
-            break;
-    }
-}
-
-
-void initGlut(int argc, char *argv[], int wWidth, int wHeight)
+void initGlut(int argc, char *argv[])
 {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowPosition(100,100);
-	glutInitWindowSize(wWidth, wHeight);
 	glutCreateWindow("GL interop");
-	glutDisplayFunc(renderScene);
-	glutIdleFunc(renderScene);
-	glutReshapeFunc(reshape);
-	glutKeyboardFunc(KeyboardGL);
+	glutIconifyWindow();
+	glutDisplayFunc(computeVBO);
+	glutIdleFunc(computeVBO);
 	glewInit();
 }
 
 GLuint initVBO(int vbolen )
 {
-    GLint bsize;
+	GLint bsize;
 
-    GLuint vbo_buffer; 
-    // generate the buffer
-    glGenBuffers(1, &vbo_buffer);
-    
-    // bind the buffer 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_buffer); 
+	GLuint vbo_buffer; 
+	// generate the buffer
+	glGenBuffers(1, &vbo_buffer);
+
+	// bind the buffer 
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_buffer); 
 	if( glGetError() != GL_NO_ERROR ) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 	}
-    
-    // create the buffer, this basically sets/allocates the size
+
+	// create the buffer, this basically sets/allocates the size
 	// for our VBO we will hold 2 line endpoints per element
-    glBufferData(GL_ARRAY_BUFFER, vbolen*sizeof(float)*4, NULL, GL_STREAM_DRAW);  
+	glBufferData(GL_ARRAY_BUFFER, vbolen*sizeof(float)*4, NULL, GL_STREAM_DRAW);  
 	if( glGetError() != GL_NO_ERROR ) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 	}
-    // recheck the size of the created buffer to make sure its what we requested
-    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bsize); 
-    if ((GLuint)bsize != (vbolen*sizeof(float)*4)) {
-        printf("Vertex Buffer object (%d) has incorrect size (%d).\n", (unsigned)vbo_buffer, (unsigned)bsize);
-    }
+	// recheck the size of the created buffer to make sure its what we requested
+	glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bsize); 
+	if ((GLuint)bsize != (vbolen*sizeof(float)*4)) {
+		printf("Vertex Buffer object (%d) has incorrect size (%d).\n", (unsigned)vbo_buffer, (unsigned)bsize);
+	}
 
-    // we're done, so unbind the buffers
-    glBindBuffer(GL_ARRAY_BUFFER, 0);                    
+	// we're done, so unbind the buffers
+	glBindBuffer(GL_ARRAY_BUFFER, 0);                    
 	if( glGetError() != GL_NO_ERROR ) {
 		std::cerr<<"Could not bind buffer"<<std::endl;
 	}
 	return vbo_buffer;
 }
 
-
-cl_int computeVBO()
+void computeVBO()
 {
 	cl_int errNum;
 
@@ -172,20 +105,19 @@ cl_int computeVBO()
 	static cl_int seq = 0;
 	seq = (seq+1)%(imWidth);
 
-    // Set the kernel arguments, send the cl_mem object for the VBO
-    errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_vbo_mem);
-    errNum = clSetKernelArg(kernel, 1, sizeof(cl_int), &imWidth);
-    errNum = clSetKernelArg(kernel, 2, sizeof(cl_int), &imHeight);
-    errNum = clSetKernelArg(kernel, 3, sizeof(cl_int), &seq);
-    if (errNum != CL_SUCCESS)
-    {
-        std::cerr << "Error setting kernel arguments." << std::endl;
-        Cleanup();
-        return 1;
-    }
+	// Set the kernel arguments, send the cl_mem object for the VBO
+	errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_vbo_mem);
+	errNum = clSetKernelArg(kernel, 1, sizeof(cl_int), &imWidth);
+	errNum = clSetKernelArg(kernel, 2, sizeof(cl_int), &imHeight);
+	errNum = clSetKernelArg(kernel, 3, sizeof(cl_int), &seq);
+	if (errNum != CL_SUCCESS)
+	{
+		std::cerr << "Error setting kernel arguments." << std::endl;
+		Cleanup();
+	}
 
-    size_t globalWorkSize[1] = { vbolen };
-    size_t localWorkSize[1] = { 32 };
+	size_t globalWorkSize[1] = { vbolen };
+	size_t localWorkSize[1] = { 32 };
 
 	// Acquire the GL Object
 	// Note, we should ensure GL is completed with any commands that might affect this VBO
@@ -193,26 +125,24 @@ cl_int computeVBO()
 	glFinish();
 	errNum = clEnqueueAcquireGLObjects(commandQueue, 1, &cl_vbo_mem, 0, NULL, NULL );
 
-    // Queue the kernel up for execution across the array
-		for(int i = 0; i < 4000; ++i)
+	// Queue the kernel up for execution across the array
+	for(int i = 0; i < 4000; ++i)
+	{
+		errNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL,
+																globalWorkSize, localWorkSize,
+																0, NULL, NULL);
+		if (errNum != CL_SUCCESS)
 		{
-			errNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL,
-																			globalWorkSize, localWorkSize,
-																			0, NULL, NULL);
-			if (errNum != CL_SUCCESS)
-			{
-					std::cerr << "Error queuing kernel for execution." << std::endl;
-			}
+			std::cerr << "Error queuing kernel for execution." << std::endl;
 		}
+	}
 
 	// Release the GL Object
 	// Note, we should ensure OpenCL is finished with any commands that might affect the VBO
 	errNum = clEnqueueReleaseGLObjects(commandQueue, 1, &cl_vbo_mem, 0, NULL, NULL );
 	clFinish(commandQueue);
 	Cleanup();
-	return 0;
 }
-
 
 ///
 //  Create an OpenCL context on the first available platform using
@@ -220,73 +150,73 @@ cl_int computeVBO()
 //
 cl_context CreateContext()
 {
-    cl_int errNum;
-    cl_uint numPlatforms;
-    cl_platform_id firstPlatformId;
-    cl_context context = NULL;
+	cl_int errNum;
+	cl_uint numPlatforms;
+	cl_platform_id firstPlatformId;
+	cl_context context = NULL;
 
-    // First, select an OpenCL platform to run on.  For this example, we
-    // simply choose the first available platform.  Normally, you would
-    // query for all available platforms and select the most appropriate one.
-    errNum = clGetPlatformIDs(1, &firstPlatformId, &numPlatforms);
-    if (errNum != CL_SUCCESS || numPlatforms <= 0)
-    {
-        std::cerr << "Failed to find any OpenCL platforms." << std::endl;
-        return NULL;
-    }
+	// First, select an OpenCL platform to run on.  For this example, we
+	// simply choose the first available platform.  Normally, you would
+	// query for all available platforms and select the most appropriate one.
+	errNum = clGetPlatformIDs(1, &firstPlatformId, &numPlatforms);
+	if (errNum != CL_SUCCESS || numPlatforms <= 0)
+	{
+			std::cerr << "Failed to find any OpenCL platforms." << std::endl;
+			return NULL;
+	}
 
-    // Next, create an OpenCL context on the platform.  Attempt to
-    // create a GPU-based context, and if that fails, try to create
-    // a CPU-based context.
-    cl_context_properties contextProperties[] =
-    {
+	// Next, create an OpenCL context on the platform.  Attempt to
+	// create a GPU-based context, and if that fails, try to create
+	// a CPU-based context.
+	cl_context_properties contextProperties[] =
+	{
 #ifdef _WIN32
-        CL_CONTEXT_PLATFORM,
-        (cl_context_properties)firstPlatformId,
-		CL_GL_CONTEXT_KHR,
-		(cl_context_properties)wglGetCurrentContext(),
-		CL_WGL_HDC_KHR,
-		(cl_context_properties)wglGetCurrentDC(),
+			CL_CONTEXT_PLATFORM,
+			(cl_context_properties)firstPlatformId,
+	CL_GL_CONTEXT_KHR,
+	(cl_context_properties)wglGetCurrentContext(),
+	CL_WGL_HDC_KHR,
+	(cl_context_properties)wglGetCurrentDC(),
 #elif defined( __GNUC__)
-		CL_CONTEXT_PLATFORM, (cl_context_properties)firstPlatformId, 
-		CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(), 
-		CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(), 
+	CL_CONTEXT_PLATFORM, (cl_context_properties)firstPlatformId, 
+	CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(), 
+	CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(), 
 #elif defined(__APPLE__) 
-		//todo
+	//todo
 #endif
-        0
+			0
 
 
 
-    };
-	cl_uint uiDevCount;
-    cl_device_id* cdDevices;
-	// Get the number of GPU devices available to the platform
-    errNum = clGetDeviceIDs(firstPlatformId, CL_DEVICE_TYPE_GPU, 0, NULL, &uiDevCount);
+	};
+cl_uint uiDevCount;
+	cl_device_id* cdDevices;
+// Get the number of GPU devices available to the platform
+	errNum = clGetDeviceIDs(firstPlatformId, CL_DEVICE_TYPE_GPU, 0, NULL, &uiDevCount);
 
-    // Create the device list
-    cdDevices = new cl_device_id [uiDevCount];
-    errNum = clGetDeviceIDs(firstPlatformId, CL_DEVICE_TYPE_GPU, uiDevCount, cdDevices, NULL);
+	// Create the device list
+	cdDevices = new cl_device_id [uiDevCount];
+	errNum = clGetDeviceIDs(firstPlatformId, CL_DEVICE_TYPE_GPU, uiDevCount, cdDevices, NULL);
 
 
-    context = clCreateContext(contextProperties, 1, &cdDevices[0], NULL, NULL, &errNum);
-	//// alternate:
-    //context = clCreateContextFromType(contextProperties, CL_DEVICE_TYPE_GPU,
-    //                                  NULL, NULL, &errNum);
+	context = clCreateContext(contextProperties, 1, &cdDevices[0], NULL, NULL, &errNum);
+//// alternate:
+	//context = clCreateContextFromType(contextProperties, CL_DEVICE_TYPE_GPU,
+	//                                  NULL, NULL, &errNum);
 
-    if (errNum != CL_SUCCESS)
-    {
-        std::cout << "Could not create GPU context, trying CPU..." << std::endl;
-        context = clCreateContextFromType(contextProperties, CL_DEVICE_TYPE_CPU,
-                                          NULL, NULL, &errNum);
-        if (errNum != CL_SUCCESS)
-        {
-            std::cerr << "Failed to create an OpenCL GPU or CPU context." << std::endl;
-            return NULL;
-        }
-    }
+	if (errNum != CL_SUCCESS)
+	{
+			std::cout << "Could not create GPU context, trying CPU..." << std::endl;
+			context = clCreateContextFromType(contextProperties, CL_DEVICE_TYPE_CPU,
+																				NULL, NULL, &errNum);
+			if (errNum != CL_SUCCESS)
+			{
+					std::cerr << "Failed to create an OpenCL GPU or CPU context." << std::endl;
+					return NULL;
+			}
+	}
 
-    return context;
+	return context;
 }
 
 ///
@@ -407,10 +337,10 @@ bool CreateMemObjects(cl_context context, GLuint vbo, cl_mem *p_cl_vbo_mem )
 //
 void Cleanup()
 {
-    if (commandQueue != 0)
-        clReleaseCommandQueue(commandQueue);
+	if (commandQueue != 0)
+		clReleaseCommandQueue(commandQueue);
 
-    if (kernel != 0)
+	if (kernel != 0)
         clReleaseKernel(kernel);
 
     if (program != 0)
@@ -442,7 +372,7 @@ int main(int argc, char** argv)
 	imHeight = 256;
 	vbolen = imHeight;
 
-	initGlut(argc, argv, imWidth, imHeight);
+	initGlut(argc, argv);
 	vbo = initVBO(vbolen);
 
     // Create an OpenCL context on first available platform
