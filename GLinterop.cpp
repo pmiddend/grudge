@@ -38,9 +38,7 @@
 // OpenGL/CL variables, objects
 //
 GLuint vbo = 0;
-int vbolen; 
-int imWidth = 0;
-int imHeight = 0;
+int const vbolen = 256; 
 cl_mem cl_vbo_mem;
 cl_kernel kernel = 0;
 cl_context context = 0;
@@ -63,7 +61,7 @@ void initGlut(int argc, char *argv[])
 	glewInit();
 }
 
-GLuint initVBO(int vbolen )
+GLuint initVBO()
 {
 	GLint bsize;
 
@@ -361,12 +359,8 @@ int main(int argc, char** argv)
 {
 	cl_device_id device = 0;
 
-	imWidth = 256; 
-	imHeight = 256;
-	vbolen = imHeight;
-
 	initGlut(argc, argv);
-	vbo = initVBO(vbolen);
+	vbo = initVBO();
 
     // Create an OpenCL context on first available platform
     context = CreateContext();
